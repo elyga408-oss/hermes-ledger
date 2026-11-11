@@ -1,0 +1,13 @@
+{
+  "name": "hermes-ledger",
+  "label": "Ledger",
+  "description": "Tamper-evident tool-call timeline with a chain-intact badge",
+  "icon": "Shield",
+  "version": "0.1.0",
+  "tab": {
+    "path": "/ledger",
+    "position": "end"
+  },
+  "entry": "dist/index.js",
+  "api": "plugin_api.py"
+}

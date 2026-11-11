@@ -1,0 +1,16 @@
+name: hermes-ledger
+version: 0.1.0
+description: Tamper-evident flight recorder. Every tool call, its redacted arguments, its result hash and every approval go into a local hash-chained, Ed25519-signed log that `hermes ledger verify` checks end to end.
+manifest_version: 1
+api_version: 1
+license: MIT
+homepage: https://github.com/elyga408-oss/hermes-ledger
+tags: [audit, security, provenance, observability]
+requires_hermes: ">=0.19.0"
+provides_tools: []
+provides_hooks:
+  - pre_tool_call
+  - post_tool_call
+  - post_approval_response
+  - on_session_start
+  - on_session_end
