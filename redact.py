@@ -25,7 +25,11 @@ MAX_ITEMS = 200
 
 SENSITIVE_KEY = re.compile(r"(?i)(key|token|secret|password|passwd|auth|cookie|credential)")
 
-_NAME = r"[A-Za-z0-9_.-]*(?i:key|token|secret|password|passwd|auth|cookie|credential)[A-Za-z0-9_.-]*"
+# Bounded name segments: unbounded runs on both sides of the keyword made matching
+# quadratic on long single-line runs of '-', '.' or '--a' (pre_tool_call hot path).
+_NAME = r"[A-Za-z0-9_.-]{0,64}(?i:key|token|secret|password|passwd|auth|cookie|credential)[A-Za-z0-9_.-]{0,64}"
+# Only start a name where no name character precedes, so a match never restarts inside one.
+_START = r"(?<![A-Za-z0-9_.-])"
 
 _VALUE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # PEM private keys
@@ -43,13 +47,13 @@ _VALUE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bAIza[0-9A-Za-z_-]{30,}"), MASK),
     (re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"), MASK),
     # NAME=value, NAME: value, --name value / --name=value  (name matches the sensitive-key rule)
-    (re.compile(r"(?P<n>(?<![A-Za-z0-9_])" + _NAME + r")(?P<sep>\s*[=:]\s*)"
+    (re.compile(r"(?P<n>" + _START + _NAME + r")(?P<sep>\s*[=:]\s*)"
                 r"(?P<v>\"[^\"]*\"|'[^']*'|[^\s,;&|]+)"),
      r"\g<n>\g<sep>" + MASK),
-    (re.compile(r"(?P<n>--" + _NAME + r")(?P<sep>[ =])(?P<v>\"[^\"]*\"|'[^']*'|[^\s]+)"),
+    (re.compile(r"(?P<n>" + _START + "--" + _NAME + r")(?P<sep>[ =])(?P<v>\"[^\"]*\"|'[^']*'|[^\s]+)"),
      r"\g<n>\g<sep>" + MASK),
     # URL credentials: scheme://user:pass@host
-    (re.compile(r"(?P<s>[a-z][a-z0-9+.-]*://[^/\s:@]+:)[^/\s@]+@"), r"\g<s>" + MASK + "@"),
+    (re.compile(r"(?P<s>(?<![a-z0-9+.-])[a-z][a-z0-9+.-]{0,31}://[^/\s:@]{1,256}:)[^/\s@]{1,256}@"), r"\g<s>" + MASK + "@"),
 ]
 
 

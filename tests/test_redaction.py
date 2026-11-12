@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from conftest import FakeCtx, hooks_mod, plugin, redact_mod
 
 redact = redact_mod.redact
@@ -57,3 +59,37 @@ def test_hook_writes_redacted_args_only(ledger):
     text = ledger.path.read_text()
     assert SK not in text and "zzz" not in text
     assert MASK in text
+
+
+@pytest.mark.parametrize("unit", ["-", ".", "--a", "a", "_-.", "key-", "a:", "x=", "--key "])
+def test_long_single_line_runs_are_fast(unit):
+    # 200 KB single-line runs used to make the NAME=value rules quadratic, and
+    # pre_tool_call runs before truncation, so a slow pattern could block a call.
+    import time
+    text = (unit * (200_000 // len(unit) + 1))[:200_000]
+    t = time.perf_counter()
+    redact_mod.redact_string(text)
+    assert time.perf_counter() - t < 1.0
+
+
+@pytest.mark.parametrize("text, secret", [
+    ("MY_API_KEY=hunter2xyz", "hunter2xyz"),
+    ("foo.auth_token: 'abc123def'", "abc123def"),
+    ("run --api-key=zzz999yyy now", "zzz999yyy"),
+    ("run --api-key zzz999yyy now", "zzz999yyy"),
+    ("x " + "-" * 5000 + " PASSWORD=pw0123456", "pw0123456"),
+])
+def test_bounded_names_still_mask(text, secret):
+    out = redact_mod.redact_string(text)
+    assert secret not in out and "[REDACTED]" in out
+
+
+def test_url_credentials_still_masked_and_fast():
+    import time
+    out = redact_mod.redact_string("clone https://bob:s3cretpass@example.com/repo.git")
+    assert "s3cretpass" not in out and "bob:" in out
+    for unit in ("a", "a:", "a://b:", "ab+"):
+        text = (unit * (200_000 // len(unit) + 1))[:200_000]
+        t = time.perf_counter()
+        redact_mod.redact_string(text)
+        assert time.perf_counter() - t < 1.0, unit
